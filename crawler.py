@@ -3,24 +3,30 @@ from selenium import webdriver
 from pyvirtualdisplay import Display
 
 
-class JanafCrawler(object):
-    """Base class to crawl http://kinetics.nist.gov/janaf/ using the selenium webdriver."""
+class CrawlerError(Exception):
+    """Base class to handle errors associated with the `Crawler` class."""
+    pass
 
-    def __init__(self, display_size=None, display_visible=None, browser_data_dir=None, default_download_dir=None):
+
+class Crawler(object):
+    """Base class to crawl http://kinetics.nist.gov/janaf/ using selenium webdriver and ChromeDriver."""
+
+    def __init__(self, display_params=None, browser_options=None):
 
         self._url = 'http://kinetics.nist.gov/janaf/'
 
-        self._display_size = None
-        self.display_size = display_size
+        self._display_params = {}
+        if display_params:
+            self.display_params = display_params
 
-        self._display_visible = None
-        self.display_visible = display_visible
+        self.virtual_display = Display(**self.display_params)
+        self.start_virtual_display()
 
-        self._browser_data_dir = None
-        self.browser_data_dir = browser_data_dir
+        self._browser_options = {}
+        if browser_options:
+            self.browser_options = browser_options
 
-        self._default_download_dir = None
-        self.default_download_dir = default_download_dir
+        self.browser = webdriver.Chrome(chrome_options=self.chrome_options)
 
     @property
     def url(self):
@@ -28,66 +34,87 @@ class JanafCrawler(object):
         return self._url
 
     @property
-    def display_size(self):
-        """Tuple with the width and height of the virtual diplay."""
-        return self._display_size
+    def display_params(self):
+        """Dictionary of parameters and corresponding values to pass to `pyvirtualdisplay.Display` constructor."""
+        return self._display_params
 
-    @display_size.setter
-    def display_size(self, display_size):
-        self._display_size = (1024, 768)
-        if display_size is not None:
-            self._display_size = display_size
+    @display_params.setter
+    def display_params(self, display_params):
+        if not isinstance(display_params, dict):
+            error_msg = 'The `display_params` argument should be a Dictionary'
+            raise CrawlerError(error_msg)
 
-    @property
-    def display_visible(self):
-        """Boolean specifying if the virtual display should be visible or not."""
-        return self._display_visible
-
-    @display_visible.setter
-    def display_visible(self, display_visible):
-        self._display_visible = False
-        if display_visible is not None:
-            if isinstance(display_visible, str):
-                self._display_visible = display_visible.strip().lower()[0] == 't'
-            elif isinstance(display_visible, bool):
-                self._display_visible = display_visible
+        self._display_params = display_params
 
     @property
-    def browser_data_dir(self):
-        """String with the location of the folder containing webdriver data."""
-        _browser_data_dir = os.path.join(os.path.abspath(os.getcwd()), 'browser_data')
-        return _browser_data_dir
+    def browser_options(self):
+        """Dictionary of arguments/options and values specifying the capabilities of the ChromeDriver.
 
-    @browser_data_dir.setter
-    def browser_data_dir(self, browser_data_dir):
-        self._browser_data_dir = os.path.join(os.path.abspath(os.getcwd()), 'browser_data')
-        if browser_data_dir is not None:
-            if os.path.isdir(browser_data_dir):
-                self._browser_data_dir = os.path.abspath(browser_data_dir)
-            else:
-                error_msg = 'Input browser data directory {} does not exist'.format(browser_data_dir)
-                raise FileNotFoundError(error_msg)
+        The ChromeOptions class accepts the following arguments (NOTE: only the ones listed below are supported):
+
+        "binary": String specifying the location of the Chrome executable to use.
+
+        "args": List of Strings, each of which is a command-line argument to use when starting Chrome. Each
+                command-line argument should itself have the arguments, associated values separated by a "=" sign. A
+                list of Chrome arguments is here http://peter.sh/experiments/chromium-command-line-switches.
+                E.g. ["user-data-dir=/tmp/temp_profile", "start-maximized"]
+
+        "extensions": List of Strings, each specifying a Chrome extension to install on startup.
+
+        "prefs": Dictionary with preferences to be applied to the user profile in use, and the corresponding values.
+                 E.g. {"download": {"default_directory": "/home/example/Desktop", "prompt_for_download": False}}
+                 See the "Preferences" file in the default user data directory for more options.
+
+        (https://sites.google.com/a/chromium.org/chromedriver/capabilities has a full list. This is FYI,
+        and arguments/options not listed above are *not* supported here.
+        """
+        return self._browser_options
+
+    @browser_options.setter
+    def browser_options(self, browser_options):
+        if not self.browser_options:
+            args = ['user-data-dir=/tmp/temp_driver_profile']
+            prefs = {'download': {'default_directory': os.path.join(os.path.abspath(os.getcwd()), 'driver_downloads'),
+                                  'prompt_for_download': False}
+                     }
+            self._browser_options = {'args': args, 'prefs': prefs}
+
+        if not isinstance(browser_options, dict):
+            error_msg = 'The `browser_options` argument should be a Dictionary'
+            raise CrawlerError(error_msg)
+
+        self._browser_options.update(browser_options)
 
     @property
-    def default_download_dir(self):
-        """String with the absolute path of the location to save downloaded data by default."""
-        return self._default_download_dir
+    def chrome_options(self):
+        """`webdriver.ChromeOptions` instance with the specified `self.browser_options`."""
+        _chrome_options = webdriver.ChromeOptions()
+        if 'binary' in self.browser_options:
+            _chrome_options.binary_location = self.browser_options['binary']
+        for arg in self.browser_options.get('args', []):
+            _chrome_options.add_argument(arg)
+        for ext in self.browser_options.get('extensions', []):
+            _chrome_options.add_extension(ext)
+        if "prefs" in self.browser_options:
+            _chrome_options.add_experimental_option('prefs', self.browser_options['prefs'])
+        return _chrome_options
 
-    @default_download_dir.setter
-    def default_download_dir(self, default_download_dir):
-        self._default_download_dir = os.path.join(self.browser_data_dir, 'driver_downloads')
-        if default_download_dir is not None:
-            if os.path.isdir(default_download_dir):
-                self._default_download_dir = os.path.abspath(default_download_dir)
-            else:
-                error_msg = 'Input default download directory {} does not exist'.format(default_download_dir)
-                raise FileNotFoundError(error_msg)
+    def start_virtual_display(self):
+        """Starts the `self.virtual_display`."""
+        self.virtual_display.start()
 
-    @property
-    def virtual_display(self):
-        """A pyvirtualdisplay.Display object with the specified visibility and size."""
-        return Display(visible=self.display_visible, size=self.display_size)
+    def stop_virtual_display(self):
+        """Stops the `self.virtual_display`."""
+        self.virtual_display.stop()
 
+    def get_page(self):
+        """The HTTP GET method to navigate to a page."""
+        self.browser.get(self.url)
 
+    def terminate_session(self):
+        """Quit the browser, stop the virtual display: terminate the session cleanly."""
+        self.browser.stop_client()
+        self.browser.quit()
+        self.stop_virtual_display()
 
 

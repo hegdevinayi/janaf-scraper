@@ -10,9 +10,59 @@ class ScraperError(Exception):
 
 
 class Scraper(object):
-    """Base class to crawl http://kinetics.nist.gov/janaf/ using selenium webdriver and ChromeDriver."""
+    """Base class to crawl http://kinetics.nist.gov/janaf/ using selenium webdriver and ChromeDriver.
+
+    Attributes:
+        virtual_display: `pyvirtualdisplay.Display` instance of a virtual display with the specified properties.
+            Defaults to None.
+
+        browser: `webdriver.Chrome` instance of a ChromeDriver with the specified browser options.
+            Defaults to the browser storing user profile data in "/tmp/temp_driver_profile", default download
+            directory as "./driver_downloads/", and prompt for download disabled.
+
+    """
 
     def __init__(self, use_virtual_display=None, virtual_display_params=None, browser_options=None):
+        """Constructor.
+
+        Args:
+            use_virtual_display: Boolean specifying whether to use a virtual display or not. If True,
+                `pyvirtualdisplay.Display` is used to start a virtual display (may require the user to install `Xvfb`
+                or other supported display server backends).
+                Defaults to False.
+
+            virtual_display_params: Dictionary of parameters and corresponding values to pass to the
+                `pyvirtualdisplay.Display` constructor.
+                (Supported parameters are "backend", "visible", "size", "color_depth", "bgcolor", and "use_xauth".
+                See http://pyvirtualdisplay.readthedocs.io/en/latest/ for details.)
+
+            browser_options: Dictionary of arguments/options and values specifying the capabilities of the ChromeDriver.
+
+                The ChromeOptions class accepts the following arguments (NOTE: only the ones listed below are
+                supported):
+
+                "binary": String specifying the location of the Chrome executable to use.
+
+                "args": List of Strings, each of which is a command-line argument to use when starting Chrome. Each
+                    command-line argument should itself have the arguments, associated values separated by a "=" sign.
+                    E.g. ["user-data-dir=/tmp/temp_profile", "start-maximized"]
+                    (A list of Chrome arguments is here http://peter.sh/experiments/chromium-command-line-switches.)
+
+                "extensions": List of Strings, each specifying a Chrome extension to install on startup.
+
+                "prefs": Dictionary with preferences to be applied to the user profile currently in use, and the
+                    corresponding values.
+                    E.g. {"download": {"default_directory": "/home/example/Desktop", "prompt_for_download": False}}
+                    See the "Preferences" file in the default user data directory for more options.
+
+                (https://sites.google.com/a/chromium.org/chromedriver/capabilities has a full list. This is FYI,
+                and arguments/options not listed above are *not* supported here.)
+
+        Raises:
+            `scraper.ScraperError` if either the specified "virtual_display_params" or "browser_options" is not a
+            Dictionary.
+
+        """
 
         self._url = 'http://kinetics.nist.gov/janaf/'
 

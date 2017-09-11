@@ -10,6 +10,13 @@ class Parser(object):
     """Base class to parse NIST-JANAF tables."""
 
     def __init__(self, url=None):
+        """Constructor.
+
+        Args:
+            url: String with the URL of the NIST-JANF data to be parsed. Defaults to None.
+                 E.g. "http://kinetics.nist.gov/janaf/html/Al-096.txt"
+
+        """
 
         self.HEADERS = ['T', 'C_p', 'S', '-[G-H(T_R)]/T', 'H-H(T_R)', 'dHf', 'dG', 'log_K_f']
 

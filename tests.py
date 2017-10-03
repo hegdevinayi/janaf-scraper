@@ -1,6 +1,6 @@
 import unittest
 from scraper import Scraper
-from parser import Parser
+from table_parser import Parser
 
 
 class TestScraper(unittest.TestCase):
